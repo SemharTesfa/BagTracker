@@ -1,0 +1,91 @@
+package application;
+
+import java.sql.PreparedStatement;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+
+import javafx.scene.Scene;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.TextArea;
+import javafx.scene.layout.VBox;
+import javafx.scene.text.Text;
+
+public class AddComments {
+
+    public static void showNewComment(Main main, List<String> ticketName) {
+
+        // Create a VBox for the new Comment page
+        VBox newComm = new VBox(10);
+        newComm.setStyle("-fx-background-color: Lavender; -fx-font-size: 12px; -fx-font-family: 'Comic Sans MS';");
+
+        ComboBox<String> ticketComboBox = new ComboBox<>();
+        ticketComboBox.setPromptText("Select Ticket"); // Prompt text for the combo box
+        ticketComboBox.getItems().addAll(ticketName);
+
+        TextArea newCommentDescription = new TextArea();
+        newCommentDescription.setStyle("-fx-prompt-text-fill: gray;");
+        newCommentDescription.setPromptText("*New Comment's Description: (required)");
+
+        Button saveCommentButton = new Button("Save New Comment");
+        Button backButton = new Button("Back");
+
+        // Automatic timestamp, non-editable
+        LocalDateTime now = LocalDateTime.now();
+        String commentTimestamp = now.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+        Text commTime = new Text(10, 50, commentTimestamp);
+
+        // Define actions for the buttons
+        saveCommentButton.setOnAction(event -> {
+            String selectedTicketName = ticketComboBox.getValue();
+            String comment = newCommentDescription.getText();
+            String date = LocalDate.now().toString();
+            
+            if (selectedTicketName != null && !comment.isEmpty()) {
+                saveAddComment(main, selectedTicketName, comment, date);
+                main.startScreen(main.loadTicketsNameFromDataBase());
+            }else {
+            	showRequiredFieldAlert();
+            }
+
+        });
+
+        backButton.setOnAction(event -> main.startScreen(main.loadTicketsNameFromDataBase()));
+
+        // Add components to the new comment VBox
+        newComm.getChildren().addAll(ticketComboBox, newCommentDescription, commTime, saveCommentButton, backButton);
+
+        // Set the scene and show it
+        main.projectStage.setScene(new Scene(newComm, 650, 400));
+        main.projectStage.setTitle(main.title);
+        main.projectStage.show();
+    }
+
+    public static void saveAddComment(Main main, String selectedTicketName, String comment, String date) {
+
+        try {
+            String ticket_name = selectedTicketName;
+
+            String insertCommentSQL = "INSERT INTO Comments (ticket_name, comment, date) VALUES (?, ?, ?)";
+
+            PreparedStatement pstmt = main.connectToDatabase.prepareStatement(insertCommentSQL);
+            pstmt.setString(1, ticket_name);
+            pstmt.setString(2, comment);
+            pstmt.setString(3, date);
+            pstmt.executeUpdate();
+            pstmt.close();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+    private static void showRequiredFieldAlert() {
+        Alert alert = new Alert(Alert.AlertType.WARNING);
+        alert.setTitle("Required Fields");
+        alert.setHeaderText("Please fill in Ticket Name & Comment(required fields).");
+        alert.showAndWait();
+    }
+}
