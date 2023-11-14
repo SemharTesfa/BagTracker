@@ -1,0 +1,78 @@
+package application;
+
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.layout.VBox;
+import java.sql.PreparedStatement;
+import java.util.List;
+
+public class CreateNewTicket {
+    public static void showCreateNewTicket(Main main, List<String> projectNames) {
+        // Create a VBox for the new ticket page
+        VBox newTicketBox = new VBox(10);
+
+        // Create input fields and buttons for the new ticket
+        ComboBox<String> projectComboBox = new ComboBox<>();
+        projectComboBox.setPromptText("Select Project"); // Prompt text for the combo box
+        projectComboBox.getItems().addAll(projectNames);
+
+        TextField newTicketTitle = new TextField();
+        newTicketTitle.setStyle("-fx-font-size: 12px; -fx-font-family: 'Comic Sans MS';");
+        newTicketTitle.setPromptText("Enter Ticket Title (required)");
+
+        TextArea newTicketDescription = new TextArea();
+        newTicketDescription.setPromptText("Ticket Description");
+
+        Button saveTicketButton = new Button("Save New Ticket");
+        Button backButton = new Button("Back");
+
+        // Define actions for the buttons
+        saveTicketButton.setOnAction(event -> {
+            String selectedProjectName = projectComboBox.getValue();
+            String title = newTicketTitle.getText();
+            String description = newTicketDescription.getText();
+
+            if (selectedProjectName != null && !selectedProjectName.isEmpty() &&
+                title != null && !title.isEmpty()) {
+                saveNewTicket(main, selectedProjectName, title, description);
+                main.startScreen(main.loadProjectNamesFromDatabase()); // Navigate back to the home page
+            } else {
+                // Handle missing project name or title
+                showRequiredFieldAlert();
+            }
+        });
+
+        backButton.setOnAction(event -> main.startScreen(main.loadProjectNamesFromDatabase())); // Navigate back to the home page
+
+        // Add components to the new ticket VBox
+        newTicketBox.getChildren().addAll(projectComboBox, newTicketTitle, newTicketDescription, saveTicketButton, backButton);
+
+        // Set the scene and show it
+        main.projectStage.setScene(new Scene(newTicketBox, 650, 400));
+        main.projectStage.setTitle(main.title);
+        main.projectStage.show();
+    }
+
+    public static void saveNewTicket(Main main, String projectName, String title, String description) {
+        try {
+            String project_name = projectName;
+
+            String insertTicketSQL = "INSERT INTO Tickets (project_name, title, description) VALUES (?, ?, ?)";
+            PreparedStatement pstmt = main.connectToDatabase.prepareStatement(insertTicketSQL);
+            pstmt.setString(1, project_name);
+            pstmt.setString(2, title);
+            pstmt.setString(3, description);
+            pstmt.executeUpdate();
+            pstmt.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void showRequiredFieldAlert() {
+        Alert alert = new Alert(Alert.AlertType.WARNING);
+        alert.setTitle("Required Fields");
+        alert.setHeaderText("Please fill in Project Name and Title (required fields).");
+        alert.showAndWait();
+    }
+}
