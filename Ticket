@@ -1,0 +1,39 @@
+package application;
+
+import javafx.beans.property.SimpleStringProperty;
+
+public class Ticket {
+    private final SimpleStringProperty title;
+    private final SimpleStringProperty description;
+    private final SimpleStringProperty projectName;
+
+    public Ticket(String title, String description, String projectName) {
+        this.title = new SimpleStringProperty(title);
+        this.description = new SimpleStringProperty(description);
+        this.projectName = new SimpleStringProperty(projectName);
+    }
+
+    public String getTitle() {
+        return title.get();
+    }
+
+    public String getDescription() {
+        return description.get();
+    }
+
+    public String getProjectName() {
+        return projectName.get();
+    }
+
+    public SimpleStringProperty titleProperty() {
+        return title;
+    }
+
+    public SimpleStringProperty descriptionProperty() {
+        return description;
+    }
+
+    public SimpleStringProperty projectNameProperty() {
+        return projectName;
+    }
+}
