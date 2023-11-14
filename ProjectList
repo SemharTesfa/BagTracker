@@ -1,0 +1,161 @@
+package application;
+
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Scene;
+import javafx.scene.control.Button;
+import javafx.scene.control.ListView;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+import javafx.scene.control.TextField;
+import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.input.KeyCode;
+import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+
+public class ProjectList {
+
+    @SuppressWarnings("unchecked")
+	public static void showProjectList(Main main) {
+        // Create a TableView to display project data
+        TableView<ProjectDataController> tableView = new TableView<>();
+
+        // Define table columns
+        TableColumn<ProjectDataController, String> nameColumn = new TableColumn<>("Name");
+        TableColumn<ProjectDataController, String> descriptionColumn = new TableColumn<>("Description");
+        TableColumn<ProjectDataController, String> dateColumn = new TableColumn<>("Start Date");
+
+        // Set column value factories to link with data properties
+        nameColumn.setCellValueFactory(new PropertyValueFactory<>("name"));
+        descriptionColumn.setCellValueFactory(new PropertyValueFactory<>("description"));
+        dateColumn.setCellValueFactory(new PropertyValueFactory<>("date"));
+
+        // Add columns to the TableView
+        tableView.getColumns().addAll(nameColumn, descriptionColumn, dateColumn);
+
+        // Ensure columns are resized based on content
+        tableView.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+
+        // Create an ObservableList to store project data
+        ObservableList<ProjectDataController> projectsData = FXCollections.observableArrayList();
+
+        // Create a "Back" button
+        Button backButton = new Button("Back");
+
+        // Add a TextField for searching
+        TextField searchField = new TextField();
+        searchField.setStyle("\"-fx-background-color: Lavender; -fx-font-size: 12px; -fx-font-family: 'Comic Sans MS';\"");
+        searchField.setPromptText("🔍 Search projects...");
+        searchField.setMaxWidth(200);
+        
+     // Explicitly set prompt text color
+        searchField.setStyle("-fx-prompt-text-fill: derive(-fx-control-inner-background, -30%);");
+
+        // Create a ListView for search results
+        ListView<String> searchResults = new ListView<>();
+        searchResults.setStyle("-fx-font-size: 11px; -fx-font-family: 'Comic Sans MS';");
+        searchResults.setMaxWidth(200);
+        searchResults.setMaxHeight(100);
+        searchResults.setVisible(false);
+
+        
+        // Fetch project data from the SQLite database
+        try {
+            Connection connection = DriverManager.getConnection("jdbc:sqlite:quillqube.db");
+            Statement statement = connection.createStatement();
+            String sqlQuery = "SELECT id, name, description, startDate FROM projects";
+            ResultSet resultSet = statement.executeQuery(sqlQuery);
+
+            while (resultSet.next()) {
+                int projectID = resultSet.getInt("id");
+                String projectName = resultSet.getString("name");
+                String projectComments = resultSet.getString("description");
+                String projectDate = resultSet.getString("startDate");
+                projectsData.add(new ProjectDataController(projectID, projectName, projectComments, projectDate));
+            }
+
+            tableView.setItems(projectsData);
+            connection.close();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        // Add a ChangeListener to the search field
+        searchField.textProperty().addListener((observable, oldValue, newValue) -> {
+            performSearch(newValue, projectsData, tableView, searchResults);
+        });
+
+        // Add a key event handler to the root container (VBox in this case)
+        
+        VBox searchVBox = new VBox(10);
+        searchVBox.setStyle("\"-fx-background-color: Lavender; -fx-font-size: 12px; -fx-font-family: 'Comic Sans MS';\"");
+        searchVBox.setSpacing(5);
+        searchVBox.setAlignment(Pos.TOP_RIGHT); // Set alignment to right
+        
+        
+
+        // Create a StackPane to overlay the TableView and search results
+        StackPane stackPane = new StackPane();
+        stackPane.getChildren().addAll(tableView, searchResults);
+        StackPane.setAlignment(searchResults, Pos.TOP_RIGHT); // Align search results to the top
+
+        searchVBox.getChildren().addAll(searchField, stackPane);
+
+        // Add a key event handler to the search VBox
+        searchVBox.setOnKeyPressed(event -> {
+            if (event.getCode() == KeyCode.ESCAPE) {
+                // Handle the ESC key press
+                searchField.clear();
+                searchResults.setVisible(false);
+                tableView.setItems(projectsData); // Reset TableView to show all projects
+            }
+        });
+
+        
+        backButton.setOnAction(event -> main.startScreen(main.loadProjectNamesFromDatabase()));
+
+        // Set up the user interface for the project list
+        VBox projList = new VBox(10);
+        projList.getChildren().addAll(searchVBox, backButton);
+        projList.setPadding(new Insets(10, 10, 10, 10));
+        projList.setStyle("\"-fx-background-color: Lavender; -fx-font-size: 12px; -fx-font-family: 'Comic Sans MS';\"");
+
+        // Set the scene and show it
+        main.projectStage.setScene(new Scene(projList, 650, 400));
+        main.projectStage.setTitle("Project List");
+        main.projectStage.show();
+    }
+
+    private static void performSearch(String query, ObservableList<ProjectDataController> projectsData,
+                                      TableView<ProjectDataController> tableView, ListView<String> searchResults) {
+        searchResults.getItems().clear();
+
+        if (query.isEmpty()) {
+            searchResults.setVisible(false);
+            tableView.setItems(projectsData);
+        } else {
+            searchResults.setVisible(true);
+
+            ObservableList<String> searchResultsData = FXCollections.observableArrayList();
+            for (ProjectDataController project : projectsData) {
+                if (project.getName().toLowerCase().contains(query.toLowerCase())) {
+                    searchResultsData.add(project.getName()); // Add project name to search results
+                }
+            }
+
+            if (searchResultsData.isEmpty()) {
+                searchResults.getItems().add("No results found");
+            } else {
+                searchResults.setItems(searchResultsData);
+            }
+        }
+    }
+}
