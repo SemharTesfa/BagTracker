@@ -6,13 +6,18 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.ListView;
+import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.input.KeyCode;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
-import javafx.scene.control.ListView;
+import javafx.stage.Stage;
+
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -20,86 +25,184 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
-//...
 public class TicketList {
- @SuppressWarnings("unchecked")
-public static void showTicketList(Main main, List<String> projectNames) {
-     // Create a VBox for the ticket list page
-     VBox ticketListBox = new VBox(10);
-     ticketListBox.setStyle("-fx-font-size: 13px; -fx-font-family: 'Comic Sans MS';"); // Set background color
-     ticketListBox.setAlignment(Pos.TOP_RIGHT);
+    private TableView<Ticket> ticketTable;
+    private static boolean editOrDeleteOccurred = false;
 
-     // Add a TextField for searching
-     TextField searchField = new TextField();
-     searchField.setStyle("-fx-font-size: 13px; -fx-font-family: 'Comic Sans MS';");
-     searchField.setPromptText("🔍 Search tickets...");
-     searchField.setMaxWidth(200);
+    @SuppressWarnings("unchecked")
+	public static void showTicketList(Main main, List<String> projectNames) {
+        VBox ticketListBox = new VBox(10);
+        ticketListBox.setStyle("-fx-font-size: 13px; -fx-font-family: 'Comic Sans MS';");
+      //  ticketListBox.setAlignment(Pos.TOP_RIGHT);
 
-     // Explicitly set prompt text color
-     searchField.setStyle("-fx-prompt-text-fill: derive(-fx-control-inner-background, -30%);");
+        HBox searchBox = new HBox(0); 
+        searchBox.setAlignment(Pos.CENTER_RIGHT);
+        
+        TextField searchField = new TextField();
+        searchField.setStyle("-fx-font-size: 13px; -fx-font-family: 'Comic Sans MS';");
+        searchField.setPromptText("🔍 Search tickets...");
+        searchField.setMaxWidth(180);
+        searchField.setStyle("-fx-prompt-text-fill: derive(-fx-control-inner-background, -30%);");
 
-     // Create a ListView for search results
-     ListView<String> searchResults = new ListView<>();
-     searchResults.setStyle("-fx-font-size: 12px; -fx-font-family: 'Comic Sans MS';");
-     searchResults.setMaxWidth(200);
-     searchResults.setMaxHeight(100);
-     searchResults.setVisible(false);
+        ListView<String> searchResults = new ListView<>();
+        searchResults.setStyle("-fx-font-size: 12px; -fx-font-family: 'Comic Sans MS';");
+        searchResults.setMaxWidth(200);
+        searchResults.setMaxHeight(100);
+        searchResults.setVisible(false);
 
-     // Create a table to display the tickets
-     TableView<Ticket> ticketTable = new TableView<>();
-     TableColumn<Ticket, String> ticketTitleColumn = new TableColumn<>("Ticket title");
-     TableColumn<Ticket, String> projectColumn = new TableColumn<>("Project Name");
-     TableColumn<Ticket, String> descriptionColumn = new TableColumn<>("Description");
+        TableView<Ticket> ticketTable = new TableView<>();
+        TableColumn<Ticket, String> ticketTitleColumn = new TableColumn<>("Ticket title");
+        TableColumn<Ticket, String> projectColumn = new TableColumn<>("Project Name");
+        TableColumn<Ticket, String> descriptionColumn = new TableColumn<>("Description");
+        TableColumn<Ticket, Void> editColumn = new TableColumn<Ticket, Void>("Edit");
+        TableColumn<Ticket, Void> deleteColumn = new TableColumn<Ticket, Void>("Delete");
 
-     ticketTitleColumn.setCellValueFactory(cellData -> cellData.getValue().titleProperty());
-     projectColumn.setCellValueFactory(cellData -> cellData.getValue().projectNameProperty());
-     descriptionColumn.setCellValueFactory(cellData -> cellData.getValue().descriptionProperty());
 
-     ticketTable.getColumns().addAll(ticketTitleColumn, projectColumn, descriptionColumn);
+        ticketTitleColumn.setCellValueFactory(cellData -> cellData.getValue().titleProperty());
+        projectColumn.setCellValueFactory(cellData -> cellData.getValue().projectNameProperty());
+        descriptionColumn.setCellValueFactory(cellData -> cellData.getValue().descriptionProperty());
 
-     // Set the column resizing policy to evenly distribute space
-     ticketTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
 
-     // Fetch tickets for the selected project names
-     List<Ticket> tickets = getTicketsForProjects(main.connectToDatabase, projectNames);
-     ObservableList<Ticket> ticketsData = FXCollections.observableArrayList(tickets);
-     ticketTable.setItems(ticketsData);
+        // Set fixed sizes for the edit and delete buttons
+        int buttonWidth = 170; // Adjust the width as needed
 
-     // Add a ChangeListener to the search field
-     searchField.textProperty().addListener((observable, oldValue, newValue) -> {
-         performSearch(newValue, ticketsData, ticketTable, searchResults);
-     });
 
-     // Add a key event handler to the root container (VBox in this case)
-     ticketListBox.setOnKeyPressed(event -> {
-         if (event.getCode() == KeyCode.ESCAPE) {
-             // Handle the ESC key press
-             searchField.clear();
-             searchResults.setVisible(false);
-             ticketTable.setItems(ticketsData); // Reset TableView to show all tickets
-         }
-     });
+        editColumn.setPrefWidth(150);
+        deleteColumn.setPrefWidth(150);
 
-     // Create a "Back" button
-     Button backButton = new Button("Back");
-     backButton.setAlignment(Pos.BASELINE_LEFT);
-     backButton.setOnAction(event -> main.startScreen(main.loadProjectNamesFromDatabase()));
+        editColumn.setCellFactory(param -> new TableCell<Ticket, Void>() {
+            private final Button editButton = new Button("Edit");
 
-     // Create a StackPane to overlay the TableView and search results
-     StackPane stackPane = new StackPane();
-     stackPane.getChildren().addAll(ticketTable, searchResults);
-     StackPane.setAlignment(searchResults, Pos.TOP_RIGHT); // Align search results to the top right
+            {
+                editButton.setMinWidth(buttonWidth);
+                editButton.setMaxWidth(buttonWidth);
 
-     ticketListBox.setPadding(new Insets(20, 20, 20, 20));
+                editButton.setOnAction(event -> {
+                    Ticket selectedTicket = getTableView().getItems().get(getIndex());
+                    Edit.display(selectedTicket);
+                });
+            }
 
-     // Add components to the ticket list VBox
-     ticketListBox.getChildren().addAll(searchField, stackPane, backButton);
+            @Override
+            protected void updateItem(Void item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty) {
+                    setGraphic(null);
+                } else {
+                    setGraphic(editButton);
+                }
+            }
+        });
 
-     // Set the scene and show it
-     main.projectStage.setScene(new Scene(ticketListBox, 650, 400)); // Keep the original size
-     main.projectStage.setTitle("Ticket List");
-     main.projectStage.show();
- }
+        deleteColumn.setCellFactory(param -> new TableCell<Ticket, Void>() {
+            private final Button deleteButton = new Button("Delete");
+
+            {
+                deleteButton.setMinWidth(buttonWidth);
+                deleteButton.setMaxWidth(buttonWidth);
+
+                deleteButton.setOnAction(event -> {
+                    Ticket selectedTicket = getTableView().getItems().get(getIndex());
+                    Delete.deleteTicket(selectedTicket, ticketTable);
+                    boolean editOrDeleteOccurred = true;
+                });
+            }
+            
+
+            @Override
+            protected void updateItem(Void item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty) {
+                    setGraphic(null);
+                } else {
+                    setGraphic(deleteButton);
+                }
+            }
+        }); 
+
+        ticketTable.getColumns().addAll(ticketTitleColumn, projectColumn, descriptionColumn, editColumn, deleteColumn);
+        ticketTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+
+        List<Ticket> tickets = getTicketsForProjects(main.connectToDatabase, projectNames);
+		try {
+			tickets = getTicketsForProjects(main.connectToDatabase, projectNames);
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+        ObservableList<Ticket> ticketsData = FXCollections.observableArrayList(tickets);
+
+        ticketTable.setItems(ticketsData);
+
+        searchField.textProperty().addListener((observable, oldValue, newValue) -> {
+            performSearch(newValue, ticketsData, ticketTable, searchResults);
+        });
+
+        ticketListBox.setOnKeyPressed(event -> {
+            if (event.getCode() == KeyCode.ESCAPE && editOrDeleteOccurred) {
+                searchField.clear();
+                searchResults.setVisible(false);
+                ticketTable.setItems(ticketsData);
+                editOrDeleteOccurred = false;
+            }
+        });
+
+        ticketListBox.setOnMouseClicked(event -> {
+            if (editOrDeleteOccurred) {
+                searchField.clear();
+                searchResults.setVisible(false);
+                ticketTable.setItems(ticketsData);
+                editOrDeleteOccurred = false;
+            }
+        });
+
+        Button backButton = new Button("Back");
+        backButton.setOnAction(event -> {
+            main.startScreen(main.loadProjectNamesFromDatabase());
+            if (editOrDeleteOccurred) {
+                editOrDeleteOccurred = false;
+                return;
+            }
+        });
+
+        Button cancelSearchButton = new Button("X");
+        cancelSearchButton.setOnAction(event -> {
+            searchField.clear();
+            searchResults.setVisible(false);
+            ticketTable.setItems(ticketsData);
+            editOrDeleteOccurred = false;
+        });
+
+     // Put the search field and cancel button in an HBox
+        HBox searchFieldBox = new HBox(0);
+        searchFieldBox.getChildren().addAll(searchField, cancelSearchButton);
+
+        StackPane searchPane = new StackPane();
+        searchPane.getChildren().addAll(searchResults);
+        StackPane.setAlignment(searchResults, Pos.TOP_RIGHT);
+        
+        StackPane stackPane = new StackPane();
+        stackPane.getChildren().addAll(ticketTable, searchResults);
+        StackPane.setAlignment(searchResults, Pos.TOP_RIGHT);
+        
+        searchBox.getChildren().addAll(searchFieldBox);
+        
+        HBox backBox = new HBox(backButton); 
+        backBox.setAlignment(Pos.BASELINE_LEFT); 
+
+        HBox.setHgrow(searchBox, Priority.ALWAYS);
+        ticketListBox.setPadding(new Insets(20, 20, 20, 20));
+
+        ticketListBox.getChildren().addAll(searchBox, stackPane, backButton);
+        main.projectStage.setScene(new Scene(ticketListBox, 950, 600));
+        main.projectStage.setTitle("Ticket List");
+        main.projectStage.show();
+    }
+    private void refreshTicketList(Connection connection, List<String> projectNames) {
+        List<Ticket> tickets = getTicketsForProjects(connection, projectNames);
+        ObservableList<Ticket> ticketsData = FXCollections.observableArrayList(tickets);
+        ticketTable.setItems(ticketsData);
+    }
 
     private static List<Ticket> getTicketsForProjects(Connection connection, List<String> projectNames) {
         List<Ticket> tickets = new ArrayList<>();
@@ -129,8 +232,7 @@ public static void showTicketList(Main main, List<String> projectNames) {
         return tickets;
     }
 
-    private static void performSearch(String query, ObservableList<Ticket> ticketsData,
-                                      TableView<Ticket> ticketTable, ListView<String> searchResults) {
+    private static void performSearch(String query, ObservableList<Ticket> ticketsData, TableView<Ticket> ticketTable, ListView<String> searchResults) {
         searchResults.getItems().clear();
 
         if (query.isEmpty()) {
@@ -141,8 +243,11 @@ public static void showTicketList(Main main, List<String> projectNames) {
 
             ObservableList<String> searchResultsData = FXCollections.observableArrayList();
             for (Ticket ticket : ticketsData) {
-                if (ticket.getTitle().toLowerCase().contains(query.toLowerCase())) {
-                    searchResultsData.add(ticket.getTitle()); // Add ticket title to search results
+                // Check if the ticket title or project name contains the search query
+                if (ticket.getTitle().toLowerCase().contains(query.toLowerCase()) ||
+                        ticket.getProjectName().toLowerCase().contains(query.toLowerCase())) {
+                    String resultString = ticket.getTitle() + " - " + ticket.getProjectName();
+                    searchResultsData.add(resultString); // Add ticket title and project name to search results
                 }
             }
 
