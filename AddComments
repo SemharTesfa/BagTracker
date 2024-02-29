@@ -1,7 +1,10 @@
 package application;
 
+import java.sql.Connection;
 import java.sql.PreparedStatement;
-import java.time.LocalDate;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -35,23 +38,24 @@ public class AddComments {
 
         // Automatic timestamp, non-editable
         LocalDateTime now = LocalDateTime.now();
-        String commentTimestamp = now.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
-        Text commTime = new Text(10, 50, commentTimestamp);
-
-        // Define actions for the buttons
+        String commentTimestamp2 = now.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+        Text commTime = new Text(10, 50, commentTimestamp2);
+      
+        
         saveCommentButton.setOnAction(event -> {
             String selectedTicketName = ticketComboBox.getValue();
             String comment = newCommentDescription.getText();
-            String date = LocalDate.now().toString();
-            
-            if (selectedTicketName != null && !comment.isEmpty()) {
-                saveAddComment(main, selectedTicketName, comment, date);
-                main.startScreen(main.loadTicketsNameFromDataBase());
-            }else {
-            	showRequiredFieldAlert();
-            }
 
+            Timestamp commentTimestamp = Timestamp.valueOf(now);
+
+            if (selectedTicketName != null && !comment.isEmpty()) {
+                saveAddComment(main, selectedTicketName, comment, commentTimestamp);
+                main.startScreen(main.loadTicketsNameFromDataBase());
+            } else {
+                showRequiredFieldAlert();
+            }
         });
+
 
         backButton.setOnAction(event -> main.startScreen(main.loadTicketsNameFromDataBase()));
 
@@ -59,33 +63,67 @@ public class AddComments {
         newComm.getChildren().addAll(ticketComboBox, newCommentDescription, commTime, saveCommentButton, backButton);
 
         // Set the scene and show it
-        main.projectStage.setScene(new Scene(newComm, 650, 400));
+        main.projectStage.setScene(new Scene(newComm, 950, 600));
         main.projectStage.setTitle(main.title);
         main.projectStage.show();
     }
 
-    public static void saveAddComment(Main main, String selectedTicketName, String comment, String date) {
 
+    public static void saveAddComment(Main main, String selectedTicketName, String comment, Timestamp timestamp) {
         try {
-            String ticket_name = selectedTicketName;
+            // Check if the comment with the same content already exists for the selected ticket
+            if (commentExists(main.connectToDatabase, selectedTicketName, comment)) {
+                showError("Invalid Input", "Comment with this content already exists for the selected ticket. Please enter a different comment.");
+            } else {
+                // Format the timestamp for database insertion
+                String formattedTimestamp = timestamp.toLocalDateTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
 
-            String insertCommentSQL = "INSERT INTO Comments (ticket_name, comment, date) VALUES (?, ?, ?)";
-
-            PreparedStatement pstmt = main.connectToDatabase.prepareStatement(insertCommentSQL);
-            pstmt.setString(1, ticket_name);
-            pstmt.setString(2, comment);
-            pstmt.setString(3, date);
-            pstmt.executeUpdate();
-            pstmt.close();
-
+                // Insert the new comment into the database
+                String insertCommentSQL = "INSERT INTO Comments (ticket_name, comment, timestamp) VALUES (?, ?, ?)";
+                try (PreparedStatement pstmt = main.connectToDatabase.prepareStatement(insertCommentSQL)) {
+                    pstmt.setString(1, selectedTicketName);
+                    pstmt.setString(2, comment);
+                    pstmt.setString(3, formattedTimestamp);
+                    pstmt.executeUpdate();
+                }
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
-    private static void showRequiredFieldAlert() {
-        Alert alert = new Alert(Alert.AlertType.WARNING);
-        alert.setTitle("Required Fields");
-        alert.setHeaderText("Please fill in Ticket Name & Comment(required fields).");
-        alert.showAndWait();
-    }
-}
+
+
+
+
+	private static boolean commentExists(Connection connection, String selectedTicketName, String comment) {
+	    try {
+	        // Check if the comment exists for the selected ticket
+	        String commentQuery = "SELECT comment FROM Comments WHERE ticket_name = ? AND comment = ?";
+	        try (PreparedStatement commentStatement = connection.prepareStatement(commentQuery)) {
+	            commentStatement.setString(1, selectedTicketName);
+	            commentStatement.setString(2, comment);
+	            try (ResultSet resultSet = commentStatement.executeQuery()) {
+	                return resultSet.next();
+	            }
+	        }
+	    } catch (SQLException e) {
+	        e.printStackTrace();
+	    }
+	    return false;
+	}
+
+
+	private static void showError(String title, String content) {
+	    Alert alert = new Alert(Alert.AlertType.ERROR);
+	    alert.setTitle(title);
+	    alert.setHeaderText(null);
+	    alert.setContentText(content);
+	    alert.showAndWait();
+	}
+	    private static void showRequiredFieldAlert() {
+	        Alert alert = new Alert(Alert.AlertType.WARNING);
+	        alert.setTitle("Required Fields");
+	        alert.setHeaderText("Please fill in Ticket Name & Comment(required fields).");
+	        alert.showAndWait();
+	    }
+	}
