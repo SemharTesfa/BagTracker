@@ -2,14 +2,6 @@
 
 This is a Bug Tracker application developed using Java and JavaFX. The application helps in managing projects, tickets, and comments related to bugs and issues.
 
-## Table of Contents
-- [Features](#features)
-- [Installation](#installation)
-- [Usage](#usage)
-- [File Structure](#file-structure)
-- [Contributing](#contributing)
-- [License](#license)
-
 ## Features
 - Create and manage projects
 - Create and manage tickets within projects
